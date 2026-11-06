@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Note Roulette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..600,100;1,9..144,300..600,100&family=Outfit:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: one airy white card — title, range, a horizontal roulette reel with a center pointer, the spin button, the Fragrantica banner, then top / heart / base slots */
+:root {
+  --bg: #f5f4f8;
+  --card: #ffffff;
+  --ink: #2d2a35;
+  --muted: #8d8898;
+  --line: #e7e4ee;
+  --soft: #f7f6fa;
+  --accent: #8f7cc4;
+  --accent-deep: #6f5ba8;
+  --gold: #d9b26f;
+  --rose: #e8a9b8;
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --body: "Outfit", "Avenir Next", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; margin: 0; }
+body {
+  background:
+    radial-gradient(900px 500px at 15% -10%, #ece7f8 0%, transparent 60%),
+    radial-gradient(800px 500px at 110% 10%, #f8ebef 0%, transparent 55%),
+    var(--bg);
+  color: var(--ink); font: 400 15px/1.5 var(--body);
+  padding: 32px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+  -webkit-font-smoothing: antialiased;
+}
+.card {
+  position: relative; max-width: 640px; margin: 0 auto; background: var(--card);
+  border-radius: 28px; box-shadow: 0 1px 2px rgba(60,40,100,.04), 0 20px 60px -20px rgba(80,60,130,.18);
+  padding: 32px clamp(16px, 4.5vw, 36px) 32px;
+  display: grid; gap: 22px;
+}
+.fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+
+/* Result pop-up after the third note */
+.modal {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(240,237,247,.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  overflow-y: auto;
+}
+.modal-card {
+  width: 100%; max-width: 560px; background: #fff; border-radius: 30px; text-align: center;
+  padding: 30px clamp(16px, 4.5vw, 34px) 26px; display: grid; gap: 20px;
+  box-shadow: 0 30px 80px -24px rgba(80,60,130,.4), 0 0 0 1px rgba(143,124,196,.12);
+}
+.modal-card h2 {
+  font-family: var(--body); font-weight: 600;
+  font-size: clamp(26px, 6.5vw, 34px); line-height: 1.15; margin: 4px 0 0; letter-spacing: -.01em;
+}
+.result-notes { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.result-note { flex: 1 1 0; min-width: 0; display: grid; gap: 6px; justify-items: center; }
+.result-note img {
+  width: 100%; max-width: 140px; aspect-ratio: 1; object-fit: cover; border-radius: 20px; background: var(--soft);
+  box-shadow: 0 10px 24px -12px rgba(60,40,100,.35);
+}
+.result-note .num { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-top: 4px; }
+.result-note .name {
+  font-family: var(--display); font-variation-settings: "SOFT" 100; font-weight: 500;
+  font-size: clamp(16px, 4.2vw, 20px); line-height: 1.15; overflow-wrap: anywhere;
+}
+.result-note .group { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.result-note a { font-size: 12.5px; color: var(--accent-deep); text-decoration: none; font-weight: 500; }
+.result-note a:hover { text-decoration: underline; }
+.plus { flex: 0 0 auto; align-self: start; margin-top: clamp(30px, 10vw, 58px); color: var(--gold); font: 300 26px var(--body); }
+.modal-actions { display: grid; gap: 6px; justify-items: center; }
+.modal-actions .spin { width: 100%; }
+
+header { display: grid; gap: 4px; text-align: center; }
+.eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+h1 {
+  font-family: var(--body); font-weight: 600;
+  font-size: clamp(32px, 8vw, 42px); line-height: 1.1; margin: 0; letter-spacing: -.01em;
+}
+
+.range { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 12px; }
+.range label { display: grid; gap: 6px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.range input {
+  width: 100%; font: 500 19px var(--body); color: var(--ink); font-variant-numeric: tabular-nums;
+  background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.range input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(143,124,196,.15); }
+.range .dash { padding-bottom: 13px; color: var(--muted); }
+.range-info { font-size: 13px; color: var(--muted); text-align: center; margin: -10px 0 0; }
+.range-info.error { color: #c0392b; }
+
+/* Reel */
+.reel {
+  position: relative; height: 168px; overflow: hidden; border-radius: 22px;
+  background: linear-gradient(#faf9fc, #f3f1f8);
+  border: 1px solid var(--line);
+}
+.reel-mask {
+  position: absolute; inset: 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+.strip { position: absolute; top: 18px; left: 0; display: flex; gap: 12px; will-change: transform; }
+.item {
+  flex: 0 0 auto; width: 112px; height: 132px; border-radius: 18px; background: #fff;
+  display: grid; justify-items: center; align-content: start; gap: 8px; padding: 10px 8px;
+  box-shadow: 0 1px 2px rgba(60,40,100,.06), 0 6px 16px -8px rgba(60,40,100,.18);
+  transition: transform .5s cubic-bezier(.2,.9,.3,1.3), box-shadow .5s;
+}
+.item img { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; background: var(--soft); }
+.item span {
+  font-size: 12.5px; font-weight: 500; line-height: 1.2; text-align: center; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.item.blank { box-shadow: none; border: 1.5px dashed var(--line); background: rgba(255,255,255,.6); }
+.item.blank i { width: 72px; height: 72px; border-radius: 14px; background: var(--soft); }
+.item.blank b { width: 60%; height: 8px; border-radius: 4px; background: var(--line); margin-top: 4px; }
+.item.won {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 32px 6px rgba(217,178,111,.45), 0 10px 24px -10px rgba(60,40,100,.3);
+}
+.pointer { position: absolute; left: 50%; top: 0; bottom: 0; width: 0; z-index: 2; pointer-events: none; }
+.pointer i {
+  position: absolute; left: -9px; width: 18px; height: 12px; background: var(--accent);
+  clip-path: polygon(0 0, 100% 0, 50% 100%); border-radius: 3px;
+}
+.pointer i.top { top: 0; }
+.pointer i.bottom { bottom: 0; transform: rotate(180deg); }
+.pointer.bump i.top { animation: bump .12s ease-out; }
+@keyframes bump { 50% { transform: translateY(3px) scaleX(.85); } }
+.halo {
+  position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -110px 0 0 -110px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(217,178,111,.55), rgba(232,169,184,.25) 40%, transparent 70%);
+  opacity: 0; transform: scale(.4); pointer-events: none;
+}
+.halo.go { animation: halo 1.1s ease-out; }
+@keyframes halo { 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.6); } }
+
+.controls { display: flex; gap: 10px; align-items: center; }
+.spin {
+  flex: 1; position: relative; overflow: hidden;
+  font: 500 17px var(--body); letter-spacing: .02em; color: #fff;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+  border: 0; border-radius: 999px; padding: 17px 22px; cursor: pointer;
+  box-shadow: 0 10px 24px -10px rgba(111,91,168,.7);
+  transition: transform .15s ease, box-shadow .2s, opacity .2s;
+}
+.spin::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%);
+}
+.spin:hover::after { animation: sheen 1s ease; }
+@keyframes sheen { to { transform: translateX(120%); } }
+.spin:hover { box-shadow: 0 14px 28px -10px rgba(111,91,168,.75); }
+.spin:active { transform: scale(.98); }
+.spin:disabled { opacity: .55; cursor: default; }
+.spin:focus-visible { outline: 3px solid rgba(143,124,196,.4); outline-offset: 3px; }
+.sound {
+  flex: 0 0 auto; width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--line);
+  background: #fff; color: var(--muted); cursor: pointer; display: grid; place-items: center;
+  transition: color .2s, border-color .2s;
+}
+.sound:hover { color: var(--ink); border-color: #d6d1e2; }
+.sound:focus-visible { outline: 3px solid rgba(143,124,196,.4); outline-offset: 2px; }
+.sound svg { width: 22px; height: 22px; }
+.sound .off { display: none; }
+.sound[aria-pressed="false"] .on { display: none; }
+.sound[aria-pressed="false"] .off { display: block; }
+
+/* Banner: Fragrantica's note header — splash photo, white wash, name, group, photos */
+.banner {
+  position: relative; border-radius: 22px; overflow: hidden; color: #27272a;
+  background: #eeecf3 center / cover no-repeat; min-height: 290px;
+}
+.banner::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(rgba(255,255,255,.82), rgba(255,255,255,.7) 50%, rgba(255,255,255,0));
+}
+.banner-inner { position: relative; display: grid; gap: 12px; padding: 20px 14px 16px; text-align: center; }
+.banner-id { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: #6b6676; font-weight: 500; }
+.banner-name {
+  font-family: var(--display); font-variation-settings: "SOFT" 100; font-weight: 500;
+  font-size: clamp(30px, 7.5vw, 42px); line-height: 1.05; margin: 0; overflow-wrap: anywhere;
+  text-shadow: 0 2px 8px rgba(255,255,255,.7);
+}
+.banner-group { font-size: 15px; text-shadow: 0 1px 4px rgba(255,255,255,.8); }
+.banner-group b { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 13.5px; }
+.banner-photos { display: flex; justify-content: space-evenly; gap: 8px; padding-top: 4px; }
+.banner-photos img {
+  width: 28%; max-width: 156px; aspect-ratio: 1; object-fit: cover; border-radius: 16px;
+  background: rgba(255,255,255,.6); box-shadow: 0 6px 18px -6px rgba(0,0,0,.25);
+}
+.banner-photos img.missing { display: none; }
+.banner-link {
+  justify-self: center; font-size: 13.5px; font-weight: 500; color: var(--accent-deep); text-decoration: none;
+  background: rgba(255,255,255,.88); padding: 7px 14px; border-radius: 999px;
+}
+.banner-link:hover { background: #fff; }
+.banner-link:focus-visible { outline: 3px solid rgba(143,124,196,.4); outline-offset: 2px; }
+
+.accord { display: grid; gap: 12px; }
+.accord-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.accord-head h2 {
+  font-family: var(--display); font-variation-settings: "SOFT" 100; font-style: italic; font-weight: 400;
+  font-size: 23px; margin: 0;
+}
+.ghost { background: none; border: 0; color: var(--muted); font: 400 14px var(--body); cursor: pointer; padding: 4px 0; }
+.ghost:hover { color: var(--ink); }
+.ghost:focus-visible { outline: 3px solid rgba(143,124,196,.4); outline-offset: 2px; border-radius: 4px; }
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.slot {
+  background: var(--soft); border: 1.5px dashed var(--line); border-radius: 18px; color: var(--ink);
+  padding: 14px 8px; display: grid; gap: 6px; justify-items: center; align-content: start; text-align: center; min-width: 0;
+  font: inherit; cursor: default; transition: border-color .25s, background .25s, transform .25s;
+}
+.slot.filled { background: #fff; border: 1.5px solid var(--line); cursor: pointer; }
+.slot.filled:hover { transform: translateY(-2px); border-color: #d6d1e2; }
+.slot.filled:focus-visible { outline: 3px solid rgba(143,124,196,.4); outline-offset: 2px; }
+.slot.next { border-color: rgba(143,124,196,.55); }
+.slot.pop { animation: pop .5s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes pop { 0% { transform: scale(.85); opacity: .3; } 100% { transform: none; opacity: 1; } }
+.slot .tier { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.slot img { width: 56px; height: 56px; object-fit: cover; border-radius: 14px; }
+.slot .empty-dot { width: 56px; height: 56px; border-radius: 14px; border: 1.5px dashed var(--line); }
+.slot .name { font-weight: 500; font-size: 13.5px; line-height: 1.25; overflow-wrap: anywhere; }
+.slot .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+footer { font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.5; }
+@media (max-width: 420px) {
+  .item { width: 96px; height: 122px; }
+  .item img { width: 62px; height: 62px; }
+  .reel { height: 156px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item, .slot, .spin { transition: none; }
+  .halo.go, .slot.pop, .pointer.bump i.top, .spin:hover::after { animation: none; }
+}
+</style>
+</head>
+<body>
+<main class="card" id="card">
+  <canvas class="fx" id="fx"></canvas>
+  <header>
+    <span class="eyebrow">Fragrantica note picker</span>
+    <h1>Note Roulette</h1>
+  </header>
+
+  <form class="range" id="rangeForm" novalidate>
+    <label for="min">From<input id="min" type="number" inputmode="numeric" value="1" min="1"></label>
+    <span class="dash">–</span>
+    <label for="max">To<input id="max" type="number" inputmode="numeric" value="2019" min="1"></label>
+  </form>
+  <p class="range-info" id="rangeInfo"></p>
+
+  <div class="reel" id="reel">
+    <div class="halo" id="halo"></div>
+    <div class="reel-mask"><div class="strip" id="strip"></div></div>
+    <div class="pointer" id="pointer"><i class="top"></i><i class="bottom"></i></div>
+  </div>
+
+  <div class="controls">
+    <button class="spin" id="spin" type="button">Spin top note</button>
+    <button class="sound" id="sound" type="button" aria-pressed="true" aria-label="Sound">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="m16 9 5 6"/><path d="m21 9-5 6"/></svg>
+    </button>
+  </div>
+
+  <section class="banner" id="banner" aria-live="polite" hidden>
+    <div class="banner-inner">
+      <span class="banner-id" id="bannerLabel"></span>
+      <h3 class="banner-name" id="bannerName"></h3>
+      <div class="banner-group">Group: <b id="bannerGroup"></b></div>
+      <div class="banner-photos">
+        <img id="photo1" alt="">
+        <img id="photo2" alt="">
+        <img id="photo3" alt="">
+      </div>
+      <a class="banner-link" id="bannerLink" target="_blank" rel="noopener">Open on Fragrantica ↗</a>
+    </div>
+  </section>
+
+  <section class="accord">
+    <div class="accord-head">
+      <h2>This perfume</h2>
+      <button class="ghost" id="reset" type="button">Start over</button>
+    </div>
+    <div class="slots" id="slots"></div>
+  </section>
+
+  <div class="modal" id="result" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div>
+        <span class="eyebrow">Your next perfume</span>
+        <h2 id="resultTitle">Create a perfume with</h2>
+      </div>
+      <div class="result-notes" id="resultNotes"></div>
+      <div class="modal-actions">
+        <button class="spin" id="again" type="button">Spin a new perfume</button>
+        <button class="ghost" id="closeResult" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>Spins only real Fragrantica notes (1,970 notes, numbers 1–2019). Photos load live from Fragrantica.</footer>
+</main>
+
+<script src="notes.js"></script>
+<script>
+const TIERS = ["Note 1", "Note 2", "Note 3"];
+const IMG = "https://fimgs.net/mdimg/sastojci/";
+const SPIN_MS = 1000;
+const STRIP_LEN = 46, WIN_AT = 38;
+const $ = id => document.getElementById(id);
+const minEl = $("min"), maxEl = $("max"), infoEl = $("rangeInfo");
+const banner = $("banner"), spinBtn = $("spin"), slotsEl = $("slots");
+const reel = $("reel"), strip = $("strip"), pointer = $("pointer"), halo = $("halo");
+const soundBtn = $("sound");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const byId = new Map(NOTES.map(n => [n[0], n]));
+const noteUrl = id => `https://www.fragrantica.com/notes/note-${id}.html`;
+
+let picks = [null, null, null];
+let soundOn = true;
+
+try {
+  const saved = JSON.parse(localStorage.getItem("noteRoulette") || "{}");
+  if (saved.min) minEl.value = saved.min;
+  if (saved.max) maxEl.value = saved.max;
+  if (saved.sound === false) soundOn = false;
+} catch (e) {}
+soundBtn.setAttribute("aria-pressed", soundOn);
+
+function save() {
+  try { localStorage.setItem("noteRoulette", JSON.stringify({ min: minEl.value, max: maxEl.value, sound: soundOn })); } catch (e) {}
+}
+
+function pool() {
+  const a = parseInt(minEl.value, 10), b = parseInt(maxEl.value, 10);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return { error: "Enter two whole numbers." };
+  if (a > b) return { error: "The first number must be smaller than the second." };
+  const list = NOTES.filter(n => n[0] >= a && n[0] <= b);
+  if (!list.length) return { error: `No notes between ${a} and ${b}. Fragrantica's numbers run 1–2019.` };
+  return { list };
+}
+
+function updateInfo() {
+  const p = pool();
+  infoEl.classList.toggle("error", !!p.error);
+  infoEl.textContent = p.error || `${p.list.length.toLocaleString()} notes in this range`;
+  return p;
+}
+
+function rand() {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] / 4294967296;
+}
+const randItem = list => list[Math.floor(rand() * list.length)];
+
+/* ---------- Sound: soft ticks and a chime, made with Web Audio ---------- */
+let actx = null;
+function audio() {
+  if (!soundOn) return null;
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(freq, start, dur, gain, type = "sine") {
+  const ctx = audio(); if (!ctx) return;
+  const t = ctx.currentTime + start;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(ctx.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const tick = () => tone(2100, 0, 0.035, 0.05, "triangle");
+function chime() {
+  [[784, 0], [988, 0.09], [1319, 0.18], [1568, 0.3]].forEach(([f, s]) => tone(f, s, 1.1, 0.07));
+}
+
+/* ---------- Reel ---------- */
+function itemHTML(note) {
+  return `<div class="item" data-id="${note[0]}"><img src="${IMG}t.${note[0]}.jpg" alt="" loading="eager"><span></span></div>`;
+}
+function fillStrip(notes) {
+  strip.innerHTML = notes.map(itemHTML).join("");
+  strip.querySelectorAll(".item span").forEach((s, i) => { s.textContent = notes[i][1]; });
+  strip.querySelectorAll(".item img").forEach(img => { img.onerror = () => { img.style.visibility = "hidden"; }; });
+}
+function metrics() {
+  const items = strip.children;
+  const w = items[0].offsetWidth;
+  const step = items.length > 1 ? items[1].offsetLeft - items[0].offsetLeft : w;
+  return { w, step, view: reel.clientWidth };
+}
+// translateX that puts the center of item i under the pointer, nudged by `offset` px
+const xFor = (i, offset = 0) => { const m = metrics(); return m.view / 2 - (i * m.step + m.w / 2) - offset; };
+const currentX = () => new DOMMatrixReadOnly(getComputedStyle(strip).transform).m41;
+
+function spin() {
+  const p = updateInfo();
+  if (p.error) return;
+  save();
+  audio();
+  if (picks.indexOf(null) === -1) { picks = [null, null, null]; renderSlots(); }
+  const idx = picks.indexOf(null);
+  const result = randItem(p.list);
+  ["splash", "t2", "t3"].forEach(k => { new Image().src = `${IMG}${k}.${result[0]}.jpg`; });
+
+  // Keep the item already under the pointer at index 2, so the new strip starts where the old one stopped
+  const prev = strip.querySelector(".item.won") || strip.children[2];
+  const prevNote = (prev && byId.get(+prev.dataset.id)) || randItem(p.list);
+  const notes = Array.from({ length: STRIP_LEN }, () => randItem(p.list));
+  notes[2] = prevNote; notes[WIN_AT] = result;
+  fillStrip(notes);
+
+  const m = metrics();
+  const from = xFor(2);
+  const to = xFor(WIN_AT, (rand() - 0.5) * (m.w * 0.7));
+  strip.style.transform = `translateX(${from}px)`;
+  spinBtn.disabled = true;
+
+  const land = () => {
+    strip.style.transform = `translateX(${xFor(WIN_AT)}px)`;
+    strip.children[WIN_AT].classList.add("won");
+    picks[idx] = result;
+    showNote(result, TIERS[idx], true);
+    renderSlots(idx);
+    celebrate();
+    if (picks.indexOf(null) === -1) setTimeout(() => { showResult(); spinBtn.disabled = false; }, 1100);
+    else spinBtn.disabled = false;
+  };
+
+  if (reduceMotion) { land(); return; }
+
+  const anim = strip.animate(
+    [{ transform: `translateX(${from}px)` }, { transform: `translateX(${to}px)` }],
+    { duration: SPIN_MS, easing: "cubic-bezier(.08,.6,.12,1)", fill: "forwards" }
+  );
+  // Ticks and pointer bumps each time a card passes the pointer
+  let lastIdx = 2;
+  const watch = () => {
+    const x = currentX();
+    const i = Math.floor((m.view / 2 - x) / m.step);
+    if (i !== lastIdx) {
+      lastIdx = i;
+      tick();
+      pointer.classList.remove("bump"); void pointer.offsetWidth; pointer.classList.add("bump");
+    }
+    if (anim.playState === "running") requestAnimationFrame(watch);
+  };
+  requestAnimationFrame(watch);
+
+  anim.finished.then(() => {
+    // Ease the last few pixels so the winner settles exactly on center
+    const settle = strip.animate(
+      [{ transform: `translateX(${to}px)` }, { transform: `translateX(${xFor(WIN_AT)}px)` }],
+      { duration: 200, easing: "cubic-bezier(.3,1.4,.5,1)", fill: "forwards" }
+    );
+    anim.cancel();
+    settle.finished.then(() => { settle.cancel(); land(); });
+  });
+}
+
+/* ---------- VFX: sparkle burst from the pointer ---------- */
+const fx = $("fx"), ctx2d = fx.getContext("2d");
+let parts = [], fxRunning = false;
+function sizeFx() {
+  const r = fx.getBoundingClientRect(), d = devicePixelRatio || 1;
+  fx.width = r.width * d; fx.height = r.height * d;
+  ctx2d.setTransform(d, 0, 0, d, 0, 0);
+}
+function celebrate() {
+  chime();
+  halo.classList.remove("go"); void halo.offsetWidth; halo.classList.add("go");
+  burst(reel, 90, 7);
+}
+// Sparkles fly out from the center of `el`; the canvas covers the whole window
+function burst(el, count, speed) {
+  if (reduceMotion) return;
+  sizeFx();
+  const rr = el.getBoundingClientRect();
+  const cx = rr.left + rr.width / 2, cy = rr.top + rr.height / 2;
+  const colors = ["#d9b26f", "#f0d49c", "#e8a9b8", "#b9a8e6", "#ffffff"];
+  for (let i = 0; i < count; i++) {
+    const a = rand() * Math.PI * 2, sp = 2 + rand() * speed;
+    parts.push({
+      x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2,
+      r: 1.5 + rand() * 3.5, life: 0, max: 60 + rand() * 50,
+      c: colors[i % colors.length], star: rand() < 0.35, rot: rand() * Math.PI
+    });
+  }
+  if (!fxRunning) { fxRunning = true; requestAnimationFrame(drawFx); }
+}
+function star(x, y, r, rot) {
+  ctx2d.save(); ctx2d.translate(x, y); ctx2d.rotate(rot); ctx2d.beginPath();
+  for (let k = 0; k < 4; k++) {
+    ctx2d.lineTo(0, -r * 2.6); ctx2d.rotate(Math.PI / 4);
+    ctx2d.lineTo(0, -r * 0.6); ctx2d.rotate(Math.PI / 4);
+  }
+  ctx2d.closePath(); ctx2d.fill(); ctx2d.restore();
+}
+function drawFx() {
+  ctx2d.clearRect(0, 0, fx.width, fx.height);
+  parts = parts.filter(p => p.life < p.max);
+  for (const p of parts) {
+    p.life++; p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.96; p.vy = p.vy * 0.96 + 0.09; p.rot += 0.05;
+    const t = p.life / p.max;
+    ctx2d.globalAlpha = Math.max(0, 1 - t * t);
+    ctx2d.fillStyle = p.c;
+    ctx2d.shadowColor = p.c; ctx2d.shadowBlur = 8;
+    if (p.star) star(p.x, p.y, p.r, p.rot);
+    else { ctx2d.beginPath(); ctx2d.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx2d.fill(); }
+  }
+  ctx2d.globalAlpha = 1; ctx2d.shadowBlur = 0;
+  if (parts.length) requestAnimationFrame(drawFx);
+  else { fxRunning = false; ctx2d.clearRect(0, 0, fx.width, fx.height); }
+}
+
+/* ---------- Banner and slots ---------- */
+function setPhoto(img, src, alt) {
+  img.classList.remove("missing");
+  img.onerror = () => img.classList.add("missing");
+  img.alt = alt;
+  img.src = src;
+}
+function showNote(note, label, reveal) {
+  const [id, name] = note;
+  banner.hidden = false;
+  $("bannerName").textContent = name;
+  $("bannerGroup").textContent = NOTE_GROUPS[note[2]];
+  $("bannerLabel").textContent = `${label} · Note #${id}`;
+  banner.style.backgroundImage = `url("${IMG}splash.${id}.jpg")`;
+  setPhoto($("photo1"), `${IMG}t.${id}.jpg`, name);
+  setPhoto($("photo2"), `${IMG}t2.${id}.jpg`, `${name}, photo 2`);
+  setPhoto($("photo3"), `${IMG}t3.${id}.jpg`, `${name}, photo 3`);
+  $("bannerLink").href = noteUrl(id);
+  $("bannerLink").textContent = `Open ${name} on Fragrantica ↗`;
+  if (reveal && !reduceMotion) {
+    banner.animate(
+      [{ opacity: 0, filter: "blur(10px)", transform: "translateY(10px) scale(.98)" },
+       { opacity: 1, filter: "blur(0)", transform: "none" }],
+      { duration: 700, easing: "cubic-bezier(.2,.8,.2,1)" }
+    );
+  }
+}
+
+function renderSlots(popIdx) {
+  const next = picks.indexOf(null);
+  slotsEl.innerHTML = TIERS.map((t, i) => {
+    const note = picks[i];
+    if (!note) {
+      const cls = "slot" + (i === next ? " next" : "");
+      return `<div class="${cls}"><span class="tier">${t}</span><span class="empty-dot"></span><span class="sub">${i === next ? "Up next" : "Waiting"}</span></div>`;
+    }
+    return `<button class="slot filled${i === popIdx ? " pop" : ""}" type="button" data-i="${i}"><span class="tier">${t}</span>` +
+      `<img src="${IMG}t.${note[0]}.jpg" alt=""><span class="name"></span><span class="sub">#${note[0]}</span></button>`;
+  }).join("");
+  slotsEl.querySelectorAll(".slot.filled").forEach(el => {
+    el.querySelector(".name").textContent = picks[el.dataset.i][1];
+  });
+  spinBtn.textContent = next === -1 ? "Spin a new perfume" : `Spin ${TIERS[next].toLowerCase()}`;
+}
+
+spinBtn.addEventListener("click", spin);
+$("rangeForm").addEventListener("submit", e => { e.preventDefault(); if (!spinBtn.disabled) spin(); });
+minEl.addEventListener("input", updateInfo);
+maxEl.addEventListener("input", updateInfo);
+soundBtn.addEventListener("click", () => {
+  soundOn = !soundOn;
+  soundBtn.setAttribute("aria-pressed", soundOn);
+  save();
+});
+function clearAll() {
+  picks = [null, null, null];
+  banner.hidden = true;
+  strip.innerHTML = '<div class="item blank"><i></i><b></b></div>'.repeat(7);
+  strip.style.transform = `translateX(${xFor(3)}px)`;
+  renderSlots();
+}
+$("reset").addEventListener("click", clearAll);
+slotsEl.addEventListener("click", e => {
+  const el = e.target.closest(".slot.filled");
+  if (el) showNote(picks[el.dataset.i], TIERS[el.dataset.i], true);
+});
+
+/* ---------- Result pop-up ---------- */
+const modal = $("result"), modalCard = modal.querySelector(".modal-card");
+function showResult() {
+  const notesEl = $("resultNotes");
+  notesEl.innerHTML = picks.map((n, i) =>
+    (i ? '<span class="plus" aria-hidden="true">+</span>' : "") +
+    `<div class="result-note"><img src="${IMG}t.${n[0]}.jpg" alt=""><span class="num">${TIERS[i]}</span>` +
+    `<span class="name"></span><span class="group"></span>` +
+    `<a href="${noteUrl(n[0])}" target="_blank" rel="noopener">Fragrantica ↗</a></div>`
+  ).join("");
+  notesEl.querySelectorAll(".result-note").forEach((el, i) => {
+    el.querySelector(".name").textContent = picks[i][1];
+    el.querySelector(".group").textContent = NOTE_GROUPS[picks[i][2]];
+  });
+  modal.hidden = false;
+  $("again").focus({ preventScroll: true });
+  if (!reduceMotion) {
+    modal.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: "ease-out" });
+    modalCard.animate(
+      [{ opacity: 0, transform: "translateY(24px) scale(.94)", filter: "blur(6px)" },
+       { opacity: 1, transform: "none", filter: "blur(0)" }],
+      { duration: 550, easing: "cubic-bezier(.2,.9,.25,1.15)" }
+    );
+  }
+  chime();
+  setTimeout(() => burst(modalCard, 160, 10), 120);
+}
+function closeResult() {
+  if (modal.hidden) return;
+  modal.hidden = true;
+  spinBtn.focus({ preventScroll: true });
+}
+$("closeResult").addEventListener("click", closeResult);
+$("again").addEventListener("click", () => { closeResult(); spin(); });
+modal.addEventListener("click", e => { if (e.target === modal) closeResult(); });
+addEventListener("keydown", e => { if (e.key === "Escape") closeResult(); });
+addEventListener("resize", () => {
+  if (!spinBtn.disabled) {
+    const won = [...strip.children].findIndex(c => c.classList.contains("won"));
+    strip.style.transform = `translateX(${xFor(won >= 0 ? won : (strip.querySelector(".blank") ? 3 : 2))}px)`;
+  }
+});
+
+// Opening state: empty reel, no banner, empty slots
+clearAll();
+updateInfo();
+</script>
+</body>
+</html>
